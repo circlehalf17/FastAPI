@@ -10,4 +10,18 @@
 - 대회 관리자 측에서 새로운 서비스 구축을 희망하고 있어 다시 구축하기로 결정
 
 
+## 모델 다운로드 경로
+[Math]
+https://drive.google.com/uc?export=download&id=1oY9q2VE68jYTYeBqL3XDNLg6EmRc1P0D
 
+[Logic]
+https://drive.google.com/uc?export=download&id=10l4mPHVS-fX48mCzjS0hhVde_WFtbj4F
+
+[Knowledge]
+https://drive.google.com/uc?export=download&id=1-hzmcWlMtfjJh6pVPPlHqR8pi-bUu65L
+
+[Open]
+https://drive.google.com/uc?export=download&id=1jYWVEaT1E1udR9Rs3xonW_doGuM6oCQ2
+
+[Q&A]
+https://drive.google.com/uc?export=download&id=1hJ3GmK-zI5FOgRRX87rliOygkVRcJy5_
