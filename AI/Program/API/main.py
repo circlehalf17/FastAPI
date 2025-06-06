@@ -11,7 +11,7 @@ Original file is located at
 ### CP code
 # ---------------------------------------------------------------------
 
-# 3. 주요 라이브러리 로딩
+# 1. 주요 라이브러리 로딩
 from fastapi import FastAPI
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
@@ -32,46 +32,46 @@ def get_model_path(*path_parts):
     return Path(base).joinpath(*path_parts).resolve()
 
 
-# 4. BERT 유사도 검색
+# 2. BERT 유사도 검색
 embedding_model = SentenceTransformer('jhgan/ko-sbert-sts')
 embedding_dim = embedding_model.get_sentence_embedding_dimension()
 
-# 5. Math 문제 생성 모델 로딩
+# 3. Math 문제 생성 모델 로딩
 math_problem_model_path = get_model_path("Math", "Problem")
 math_problem_tokenizer = AutoTokenizer.from_pretrained(math_problem_model_path,local_files_only=True)
 math_problem_model = AutoModelForCausalLM.from_pretrained(math_problem_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 6. Math 정답 생성 모델 로딩
+# 4. Math 정답 생성 모델 로딩
 math_answer_model_path = get_model_path("Math","Answer")
 math_answer_tokenizer = AutoTokenizer.from_pretrained(math_answer_model_path,local_files_only=True)
 math_answer_model = AutoModelForCausalLM.from_pretrained(math_answer_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 7. Logic 문제 생성 모델 로딩
+# 5. Logic 문제 생성 모델 로딩
 logic_problem_model_path =  get_model_path("Logic","Problem")
 logic_problem_tokenizer = AutoTokenizer.from_pretrained(logic_problem_model_path,local_files_only=True)
 logic_problem_model = AutoModelForCausalLM.from_pretrained(logic_problem_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 8. Logic 정답 생성 모델 로딩
+# 6. Logic 정답 생성 모델 로딩
 logic_answer_model_path = get_model_path("Logic","Answer")
 logic_answer_tokenizer = AutoTokenizer.from_pretrained(logic_answer_model_path,local_files_only=True)
 logic_answer_model = AutoModelForCausalLM.from_pretrained(logic_answer_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 9. Knowledge 문제 생성 모델 로딩
+# 7. Knowledge 문제 생성 모델 로딩
 knowledge_problem_model_path = get_model_path("Knowledge","Problem")
 knowledge_problem_tokenizer = AutoTokenizer.from_pretrained(knowledge_problem_model_path,local_files_only=True)
 knowledge_problem_model = AutoModelForCausalLM.from_pretrained(knowledge_problem_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 10. Knowledge 정답 생성 모델 로딩
+# 8. Knowledge 정답 생성 모델 로딩
 knowledge_answer_model_path = get_model_path("Knowledge","Answer")
 knowledge_answer_tokenizer = AutoTokenizer.from_pretrained(knowledge_answer_model_path,local_files_only=True)
 knowledge_answer_model = AutoModelForCausalLM.from_pretrained(knowledge_answer_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 11. Open Problem 문제 생성 모델 로딩
+# 9. Open Problem 문제 생성 모델 로딩
 open_problem_model_path = get_model_path("Open","Problem")
 open_problem_tokenizer = AutoTokenizer.from_pretrained(open_problem_model_path,local_files_only=True)
 open_problem_model = AutoModelForCausalLM.from_pretrained(open_problem_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 12. 문제 생성 함수
+# 10. 문제 생성 함수
 def problem(prompt, model, tokenizer):
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
@@ -91,7 +91,7 @@ def problem(prompt, model, tokenizer):
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return generated_text.split("문제:")[1].strip()
 
-# 13. 정답 생성 함수
+# 11. 정답 생성 함수
 def answer(prompt, model, tokenizer):
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
@@ -108,9 +108,10 @@ def answer(prompt, model, tokenizer):
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return generated_text.split("정답:")[1].strip()
 
-# 14. FastAPI app 설정
+# 12. FastAPI app 설정
 app = FastAPI()
 
+# 13. API 엔드포인트 구축
 class ProblemRequest(BaseModel):
     topic: str
     level: str
@@ -120,7 +121,7 @@ class ProblemResponse(BaseModel):
     response: list[str]
 
 @app.post("/generate", response_model=ProblemResponse)
-def generate_problems(req: ProblemRequest):
+def generate_endpoint(req: ProblemRequest):
     global math_problem_model, math_problem_tokenizer, math_answer_model, math_answer_tokenizer
     global logic_problem_model, logic_problem_tokenizer, logic_answer_model, logic_answer_tokenizer
     global knowledge_problem_model, knowledge_problem_tokenizer, knowledge_answer_model, knowledge_answer_tokenizer
@@ -199,13 +200,13 @@ def generate_problems(req: ProblemRequest):
 ### Q&A code
 # ---------------------------------------------------------------------
 
-# 4. Q&A 모델 로딩
+# 1. Q&A 모델 로딩
 embedding_model = SentenceTransformer('jhgan/ko-sbert-sts')
 model_path = get_model_path("Q&A","Response")
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 5. 유사도 임베딩 벡터 및 FAISS 인덱스 생성
+# 2. 유사도 임베딩 벡터 및 FAISS 인덱스 생성
 qa_texts = [
     "예선대회 결과는 언제 공지되나요?",
     "문제 정답과 점수는 공개되지 않나요?",
@@ -233,7 +234,7 @@ embeddings = embedding_model.encode(qa_texts, normalize_embeddings=True, convert
 index = faiss.IndexFlatIP(embeddings.shape[1])
 index.add(embeddings)
 
-# 6. 답변 생성 함수
+# 3. 답변 생성 함수
 def response(prompt):
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
@@ -253,6 +254,7 @@ def response(prompt):
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True).replace("@ ", "@")
     return generated_text.split("답변:")[1].strip()
 
+# 4. API 엔드포인트 구축
 class QARequest(BaseModel):
     question: str
 
