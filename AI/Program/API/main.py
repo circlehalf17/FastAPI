@@ -26,52 +26,55 @@ import os
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
+# 2. 모델 경로를 절대 경로로 반환하는 함수
+# 환경 변수 MODEL_BASE_PATH(default: /app/models)를 기준으로 경로 구성
 def get_model_path(*path_parts):
     base = os.environ.get("MODEL_BASE_PATH", "/app/models")  # fallback
     # Path 객체로 반환 (절대 경로 변환 포함)
     return Path(base).joinpath(*path_parts).resolve()
 
 
-# 2. BERT 유사도 검색
+# 3. Sentence-BERT 기반 유사도 검색 모델 로딩
 embedding_model = SentenceTransformer('jhgan/ko-sbert-sts')
 embedding_dim = embedding_model.get_sentence_embedding_dimension()
 
-# 3. Math 문제 생성 모델 로딩
+# 4. Math 문제 생성 모델 로딩
 math_problem_model_path = get_model_path("Math", "Problem")
 math_problem_tokenizer = AutoTokenizer.from_pretrained(math_problem_model_path,local_files_only=True)
 math_problem_model = AutoModelForCausalLM.from_pretrained(math_problem_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 4. Math 정답 생성 모델 로딩
+# 5. Math 정답 생성 모델 로딩
 math_answer_model_path = get_model_path("Math","Answer")
 math_answer_tokenizer = AutoTokenizer.from_pretrained(math_answer_model_path,local_files_only=True)
 math_answer_model = AutoModelForCausalLM.from_pretrained(math_answer_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 5. Logic 문제 생성 모델 로딩
+# 6. Logic 문제 생성 모델 로딩
 logic_problem_model_path =  get_model_path("Logic","Problem")
 logic_problem_tokenizer = AutoTokenizer.from_pretrained(logic_problem_model_path,local_files_only=True)
 logic_problem_model = AutoModelForCausalLM.from_pretrained(logic_problem_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 6. Logic 정답 생성 모델 로딩
+# 7. Logic 정답 생성 모델 로딩
 logic_answer_model_path = get_model_path("Logic","Answer")
 logic_answer_tokenizer = AutoTokenizer.from_pretrained(logic_answer_model_path,local_files_only=True)
 logic_answer_model = AutoModelForCausalLM.from_pretrained(logic_answer_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 7. Knowledge 문제 생성 모델 로딩
+# 8. Knowledge 문제 생성 모델 로딩
 knowledge_problem_model_path = get_model_path("Knowledge","Problem")
 knowledge_problem_tokenizer = AutoTokenizer.from_pretrained(knowledge_problem_model_path,local_files_only=True)
 knowledge_problem_model = AutoModelForCausalLM.from_pretrained(knowledge_problem_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 8. Knowledge 정답 생성 모델 로딩
+# 9. Knowledge 정답 생성 모델 로딩
 knowledge_answer_model_path = get_model_path("Knowledge","Answer")
 knowledge_answer_tokenizer = AutoTokenizer.from_pretrained(knowledge_answer_model_path,local_files_only=True)
 knowledge_answer_model = AutoModelForCausalLM.from_pretrained(knowledge_answer_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 9. Open Problem 문제 생성 모델 로딩
+# 10. Open Problem 문제 생성 모델 로딩
 open_problem_model_path = get_model_path("Open","Problem")
 open_problem_tokenizer = AutoTokenizer.from_pretrained(open_problem_model_path,local_files_only=True)
 open_problem_model = AutoModelForCausalLM.from_pretrained(open_problem_model_path,local_files_only=True).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 10. 문제 생성 함수
+# 11. 문제 생성 함수 (KoGPT 기반)
+# 입력 프롬프트를 바탕으로 문제 텍스트 생성 ("문제:" 이후 텍스트 반환)
 def problem(prompt, model, tokenizer):
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
@@ -91,7 +94,8 @@ def problem(prompt, model, tokenizer):
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return generated_text.split("문제:")[1].strip()
 
-# 11. 정답 생성 함수
+# 12. 정답 생성 함수 (KoGPT 기반)
+# 문제 프롬프트를 기반으로 정답 텍스트 생성 ("정답:" 이후 텍스트 반환)
 def answer(prompt, model, tokenizer):
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
@@ -108,14 +112,14 @@ def answer(prompt, model, tokenizer):
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return generated_text.split("정답:")[1].strip()
 
-# 12. FastAPI app 설정
+# 13. FastAPI 애플리케이션 생성
 app = FastAPI()
 
-# 13. API 엔드포인트 구축
+# 14. 문제 생성 API 요청/응답 정의
 class ProblemRequest(BaseModel):
-    topic: str
-    level: str
-    count: int
+    topic: str  # 수학, 논리, 상식, 열린문제
+    level: str  # 난이도 (상/중/하)
+    count: int  # 생성할 문제 개수
 
 class ProblemResponse(BaseModel):
     response: list[str]
@@ -131,12 +135,12 @@ def generate_endpoint(req: ProblemRequest):
     level = req.level
     count = req.count
 
-    max_trials = 5
-    threshold = 0.7
-    problem_list = []
-    trials = 0
+    max_trials = 5      # 문제 생성을 반복 시도할 최대 횟수
+    threshold = 0.7     # 유사도 중복 판정 기준 (0.7 이상이면 중복)
+    problem_list = []   # 최종 결과 문제 리스트
+    trials = 0          # 현재 시도 횟수
 
-    index = faiss.IndexFlatIP(embedding_dim)
+    index = faiss.IndexFlatIP(embedding_dim)    # 내적 기반 유사도 검색 인덱스 초기화
 
     if topic == '수학':
       problem_model = math_problem_model
@@ -161,13 +165,16 @@ def generate_endpoint(req: ProblemRequest):
     else:
       return ProblemResponse(response=problem_list)
 
+    # 문제 개수(count)만큼 생성, 중복 제거 포함
     with torch.no_grad():
         while len(problem_list) < count and trials < max_trials:
             needed = count - len(problem_list)
             for _ in range(needed):
+                # 문제 생성
                 problem_prompt = f"난이도: {level} \n문제:"
                 problem_result = problem(problem_prompt, problem_model, problem_tokenizer)
 
+                # 생성된 문제에 대해 임베딩 후 중복 여부 확인
                 embedding = embedding_model.encode(problem_result, convert_to_numpy=True, normalize_embeddings=True).reshape(1, -1)
 
                 is_duplicate = False
@@ -179,6 +186,7 @@ def generate_endpoint(req: ProblemRequest):
                 if is_duplicate:
                     continue
 
+                # 정답 생성
                 if topic == '열린문제':
                     answer_result = '관점에 따라 다름'
                 else:
@@ -206,7 +214,8 @@ model_path = get_model_path("Q&A","Response")
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForCausalLM.from_pretrained(model_path).to("cuda" if torch.cuda.is_available() else "cpu")
 
-# 2. 유사도 임베딩 벡터 및 FAISS 인덱스 생성
+# 2. 유사 질문 리스트 및 FAISS 인덱스 생성
+# 사용자 질문과 가장 유사한 유사 질문을 찾아 KoGPT로 답변 생성
 qa_texts = [
     "예선대회 결과는 언제 공지되나요?",
     "문제 정답과 점수는 공개되지 않나요?",
@@ -234,7 +243,7 @@ embeddings = embedding_model.encode(qa_texts, normalize_embeddings=True, convert
 index = faiss.IndexFlatIP(embeddings.shape[1])
 index.add(embeddings)
 
-# 3. 답변 생성 함수
+# 3. 답변 생성 함수 (KoGPT 기반)
 def response(prompt):
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
@@ -254,7 +263,8 @@ def response(prompt):
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True).replace("@ ", "@")
     return generated_text.split("답변:")[1].strip()
 
-# 4. API 엔드포인트 구축
+# 4. Q&A API 요청/응답 정의
+# 유사 질문 검색 후 KoGPT 기반 답변 생성
 class QARequest(BaseModel):
     question: str
 
